@@ -17,6 +17,18 @@ const MANEUVER_STEPS = [
   "Compiling and firing autonomous thruster webhook payload"
 ];
 
+const formatRelativeSpeed = (speedKmps: number | null | undefined): string => {
+  if (speedKmps == null || !Number.isFinite(speedKmps)) return 'N/A';
+  if (speedKmps < 0.01) {
+    const metersPerSecond = speedKmps * 1000;
+    return `${metersPerSecond < 1 ? metersPerSecond.toFixed(2) : metersPerSecond.toFixed(1)} m/s`;
+  }
+  if (speedKmps < 1) {
+    return `${speedKmps.toFixed(3)} km/s`;
+  }
+  return `${speedKmps.toFixed(2)} km/s`;
+};
+
 interface ConjunctionDetailProps {
   eventId: string | null;
   onClose: () => void;
@@ -66,6 +78,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
 
   const demoMode = useSystemStore((s) => s.demoMode);
   const conjunctions = useConjunctionStore((s) => s.conjunctions);
+  const satellitePositions = useGlobeStore((s) => s.satellitePositions);
   const isAutoSelectedDemoConjunction = React.useMemo(() => {
     if (!demoMode || !conjunctions || conjunctions.length === 0) return false;
     const unresolved = conjunctions.filter((c: any) => !c.resolved);
@@ -214,17 +227,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
           return parseFloat((2 * Math.sqrt(mu / r) * Math.sin(Math.PI / 4)).toFixed(2));
         })();
 
-  const relVelocityLabel = (() => {
-    if (!Number.isFinite(relVelocity)) return 'N/A';
-    if (relVelocity < 0.01) {
-      const metersPerSecond = relVelocity * 1000;
-      return `${metersPerSecond < 1 ? metersPerSecond.toFixed(2) : metersPerSecond.toFixed(1)} m/s`;
-    }
-    if (relVelocity < 1) {
-      return `${relVelocity.toFixed(3)} km/s`;
-    }
-    return `${relVelocity.toFixed(2)} km/s`;
-  })();
+  const relVelocityLabel = formatRelativeSpeed(relVelocity);
 
   const colProb = data.collision_probability_chan !== undefined 
     ? data.collision_probability_chan 
@@ -250,6 +253,32 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
 
   const noradA = data.satA?.noradId || data.norad_id_a || '48212';
   const noradB = data.satB?.noradId || data.norad_id_b || '36114';
+
+  const findLiveSatelliteState = (noradId: string) => {
+    if (!Array.isArray(satellitePositions)) return null;
+    return satellitePositions.find((sat: any) => {
+      const id = sat.norad_id || sat.noradId || sat.id;
+      return String(id) === String(noradId);
+    }) || null;
+  };
+
+  const liveStateA = findLiveSatelliteState(noradA);
+  const liveStateB = findLiveSatelliteState(noradB);
+  const liveRelativeVelocity = (() => {
+    if (!liveStateA || !liveStateB) return null;
+    const components = ['vx', 'vy', 'vz'] as const;
+    if (!components.every((key) => Number.isFinite(Number(liveStateA[key])) && Number.isFinite(Number(liveStateB[key])))) {
+      return null;
+    }
+    const dvx = Number(liveStateA.vx) - Number(liveStateB.vx);
+    const dvy = Number(liveStateA.vy) - Number(liveStateB.vy);
+    const dvz = Number(liveStateA.vz) - Number(liveStateB.vz);
+    return Math.sqrt(dvx * dvx + dvy * dvy + dvz * dvz);
+  })();
+  const liveRelativeVelocityLabel = liveRelativeVelocity == null
+    ? 'Awaiting stream'
+    : formatRelativeSpeed(liveRelativeVelocity);
+  const liveRelativeVelocityTimestamp = liveStateA?.t || liveStateB?.t || null;
 
   const criticA = data.criticality_a !== undefined ? data.criticality_a : 8.2;
   const criticB = data.criticality_b !== undefined ? data.criticality_b : 2.5;
@@ -445,15 +474,28 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
               </span>
             </div>
 
-            {/* Met 3: Velocity */}
+            {/* Met 3: Encounter velocity at closest approach */}
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
-              <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Relative Velocity</span>
+              <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Encounter Speed at TCA</span>
               <span className="text-xs font-black font-mono text-slate-200">
                 {relVelocityLabel}
               </span>
             </div>
 
-            {/* Met 4: Prob */}
+            {/* Met 4: Live velocity from current propagated satellite stream */}
+            <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
+              <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Live Relative Speed Now</span>
+              <span className="text-xs font-black font-mono text-emerald-300">
+                {liveRelativeVelocityLabel}
+              </span>
+              {liveRelativeVelocityTimestamp && (
+                <span className="text-[7px] font-mono text-slate-600 truncate">
+                  EPOCH {String(liveRelativeVelocityTimestamp)}
+                </span>
+              )}
+            </div>
+
+            {/* Met 5: Prob */}
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Collision Probability (Pc)</span>
               <span className="text-xs font-black font-mono text-red-400">
@@ -461,7 +503,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
               </span>
             </div>
 
-            {/* Met 5: Altitude */}
+            {/* Met 6: Altitude */}
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Trajectory Altitude</span>
               <span className="text-xs font-black font-mono text-slate-200">
@@ -469,7 +511,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
               </span>
             </div>
 
-            {/* Met 6: Risk score */}
+            {/* Met 7: Risk score */}
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Threat Complexity Index</span>
               <span className="text-xs font-black font-mono text-cyan-400">

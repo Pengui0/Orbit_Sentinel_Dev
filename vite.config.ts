@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/Orbit_Sentinel_Dev/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -274,12 +274,39 @@ async def get_tracked_object_detail(norad_id: str, db = Depends(get_db)):
     serialized_sat["position"] = position_data
     return serialized_sat
 
+async def _run_tle_and_log(db):
+    from datetime import datetime, timezone
+    from backend.db import audit_repo
+    try:
+        result = await run_tle_ingestion_job(db)
+        await audit_repo.append_audit_entry(db, {
+            "timestamp": datetime.now(timezone.utc),
+            "action_type": "TLE_REFRESH",
+            "actor": "ORBIT_SENTINEL_AUTONOMOUS",
+            "outcome": "SUCCESS" if result.get("success") else "FAILED",
+            "severity": "INFO" if result.get("success") else "WARNING",
+            "details": f"TLE ingestion complete. {result.get('count', 0)} objects synced from {result.get('source', 'unknown')}.",
+            "notes": f"source={result.get('source')} count={result.get('count', 0)}"
+        })
+    except Exception as e:
+        from datetime import datetime, timezone
+        from backend.db import audit_repo
+        await audit_repo.append_audit_entry(db, {
+            "timestamp": datetime.now(timezone.utc),
+            "action_type": "TLE_REFRESH",
+            "actor": "ORBIT_SENTINEL_AUTONOMOUS",
+            "outcome": "FAILED",
+            "severity": "WARNING",
+            "details": f"TLE ingestion failed: {str(e)}",
+            "notes": str(e)
+        })
+
 @router.post("/refresh")
 async def trigger_refresh_job(background_tasks: BackgroundTasks, db = Depends(get_db)):
     """
     Trigger standard CelesTrak and Supplemental satellite synchronization in the background.
     """
-    background_tasks.add_task(run_tle_ingestion_job, db)
+    background_tasks.add_task(_run_tle_and_log, db)
     return {
         "status": "refresh_triggered",
         "message": "Background TLE refresh job has been scheduled."
@@ -363,6 +390,7 @@ async def get_current_world_positions(db = Depends(get_db)):
                 "apogee": apogee_km,
                 "perigee": perigee_km,
                 "owner": _resolve_owner(orig_sat.get("owner") or orig_sat.get("country_code") or pos.get("name", orig_sat.get("name", ""))),
+                "country": _resolve_owner(orig_sat.get("owner") or orig_sat.get("country_code") or pos.get("name", orig_sat.get("name", ""))),
                 "x": pos.get("x"),
                 "y": pos.get("y"),
                 "z": pos.get("z"),

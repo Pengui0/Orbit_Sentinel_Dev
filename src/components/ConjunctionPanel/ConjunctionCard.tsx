@@ -35,9 +35,10 @@ interface ConjunctionCardProps {
 
 // Map common owners to country emojis
 const getOwnerFlag = (owner?: string): string => {
-  if (!owner) return '';
+  if (!owner) return '🌐';
   const o = owner.toUpperCase();
-  if (o.includes('SPACEX') || o.includes('NASA') || o.includes('USSPACECOM') || o.includes('GPS') || o.includes('USA')) {
+  if (o.includes('SPACEX') || o.includes('NASA') || o.includes('USSPACECOM') || o.includes('GPS') || o.includes('USA')
+    || o.includes('STARLINK') || o.includes('TERRA') || o.includes('AQUA') || o.includes('LANDSAT')) {
     return '🇺🇸';
   }
   if (o.includes('ESA') || o.includes('EUROPE')) {
@@ -61,7 +62,7 @@ const getOwnerFlag = (owner?: string): string => {
   if (o.includes('ASAL') || o.includes('ALGERIA')) {
     return '🇩🇿';
   }
-  return '🌐';
+  return '🌐'; // known fallback — always shows something instead of N/A
 };
 
 const truncateName = (name: string, maxLen = 16): string => {
@@ -123,8 +124,8 @@ const ConjunctionCard: React.FC<ConjunctionCardProps> = ({ conjunction, isSelect
   const typeA = conjunction.object_type_a || conjunction.satA?.type || 'PAYLOAD';
   const typeB = conjunction.object_type_b || conjunction.satB?.type || 'DEBRIS';
 
-  const flagA = getOwnerFlag(conjunction.satA?.owner || conjunction.name_a);
-  const flagB = getOwnerFlag(conjunction.satB?.owner || conjunction.name_b);
+  const flagA = getOwnerFlag(conjunction.satA?.owner || conjunction.object_type_a || conjunction.name_a || '');
+  const flagB = getOwnerFlag(conjunction.satB?.owner || conjunction.object_type_b || conjunction.name_b || '');
 
   return (
     <div

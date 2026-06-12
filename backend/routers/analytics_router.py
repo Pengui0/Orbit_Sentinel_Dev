@@ -94,17 +94,30 @@ async def get_kessler_trend(db = Depends(get_db)):
             if 0 <= age_days < 7 and conj.get("risk_level") in ("CRITICAL", "HIGH"):
                 day_key = tca_dt.strftime("%Y-%m-%d")
                 day_counts[day_key] += 1
+            # Count today's unresolved future TCAs so today's bar reflects live risk
+            elif (
+                conj.get("risk_level") in ("CRITICAL", "HIGH")
+                and not conj.get("resolved", False)
+                and tca_dt > now_dt
+                and (tca_dt - now_dt).days <= 1
+            ):
+                day_counts[now_dt.strftime("%Y-%m-%d")] += 1
+
+        # Debris ratio base — constant across all days, same as WebSocket formula
+        base_kri = min((debris_cnt / max(total_leo, 1)) * 100.0, 80.0)
 
         trend = []
         for d in range(6, -1, -1):
             day_dt = now_dt - timedelta(days=d)
             day_key = day_dt.strftime("%Y-%m-%d")
             high_risk_count = day_counts.get(day_key, 0)
-            k_index = compute_kessler_index(high_risk_count, total_leo, debris_cnt)
+            # Mirror the exact scheduler formula: base + surge, capped at 100
+            surge = min(high_risk_count * 2.0, 20.0)
+            k_index = round(min(base_kri + surge, 100.0), 2)
             trend.append({
                 "date": day_key,
                 "day": day_dt.strftime("%a"),
-                "risk": round(k_index, 2)
+                "risk": k_index
             })
 
         return trend
@@ -202,7 +215,8 @@ async def get_altitude_heatmap(db = Depends(get_db)):
 @router.get("/object_type_breakdown")
 async def get_object_type_breakdown(db = Depends(get_db)):
     """
-    Extract orbital categories of objects involved in close approaches.
+    Extract orbital categories from the satellite catalogue for a realistic distribution.
+    Falls back to conjunction pair counting if satellites collection is empty.
     """
     try:
         counts = {
@@ -211,25 +225,51 @@ async def get_object_type_breakdown(db = Depends(get_db)):
             "PAYLOAD_PAYLOAD": 0,
             "ROCKET_OTHER": 0
         }
-        
-        cursor = db["conjunctions"].find({})
-        conjs = await cursor.to_list(length=1000)
-        
-        for conj in conjs:
-            t_a = conj.get("object_type_a", "UNKNOWN").upper()
-            t_b = conj.get("object_type_b", "UNKNOWN").upper()
-            
-            types = sorted([t_a, t_b])
-            
-            if types == ["DEBRIS", "DEBRIS"]:
-                counts["DEBRIS_DEBRIS"] += 1
-            elif types == ["DEBRIS", "PAYLOAD"]:
-                counts["DEBRIS_PAYLOAD"] += 1
-            elif types == ["PAYLOAD", "PAYLOAD"]:
-                counts["PAYLOAD_PAYLOAD"] += 1
-            else:
-                counts["ROCKET_OTHER"] += 1
-                
+
+        # Primary: count from satellites catalogue — gives real multi-type distribution
+        sat_cursor = db["satellites"].find({})
+        satellites = await sat_cursor.to_list(length=5000)
+
+        if satellites:
+            type_counts = {"DEBRIS": 0, "PAYLOAD": 0, "ROCKET_BODY": 0, "OTHER": 0}
+            for sat in satellites:
+                t = sat.get("object_type", "PAYLOAD").upper()
+                if t == "DEBRIS":
+                    type_counts["DEBRIS"] += 1
+                elif t == "PAYLOAD":
+                    type_counts["PAYLOAD"] += 1
+                elif t == "ROCKET_BODY":
+                    type_counts["ROCKET_BODY"] += 1
+                else:
+                    type_counts["OTHER"] += 1
+
+            total = max(sum(type_counts.values()), 1)
+            # Approximate pair probabilities from individual type frequencies
+            d = type_counts["DEBRIS"] / total
+            p = type_counts["PAYLOAD"] / total
+            r = (type_counts["ROCKET_BODY"] + type_counts["OTHER"]) / total
+            scale = max(len(satellites) // 10, 1)
+            counts["DEBRIS_DEBRIS"]  = round(d * d * scale * 10)
+            counts["DEBRIS_PAYLOAD"] = round(2 * d * p * scale * 10)
+            counts["PAYLOAD_PAYLOAD"]= round(p * p * scale * 10)
+            counts["ROCKET_OTHER"]   = round(r * scale * 10)
+        else:
+            # Fallback: count from conjunction pairs
+            cursor = db["conjunctions"].find({})
+            conjs = await cursor.to_list(length=1000)
+            for conj in conjs:
+                t_a = conj.get("object_type_a", "UNKNOWN").upper()
+                t_b = conj.get("object_type_b", "UNKNOWN").upper()
+                types = sorted([t_a, t_b])
+                if types == ["DEBRIS", "DEBRIS"]:
+                    counts["DEBRIS_DEBRIS"] += 1
+                elif types == ["DEBRIS", "PAYLOAD"]:
+                    counts["DEBRIS_PAYLOAD"] += 1
+                elif types == ["PAYLOAD", "PAYLOAD"]:
+                    counts["PAYLOAD_PAYLOAD"] += 1
+                else:
+                    counts["ROCKET_OTHER"] += 1
+
         label_map = {
             "DEBRIS_DEBRIS": "Debris-Debris",
             "DEBRIS_PAYLOAD": "Debris-Payload",
@@ -237,7 +277,8 @@ async def get_object_type_breakdown(db = Depends(get_db)):
             "ROCKET_OTHER": "Rocket-Other"
         }
         return [{"name": label_map[k], "value": v} for k, v in counts.items()]
-    except Exception as e:        raise HTTPException(status_code=500, detail=f"Failed to analyze catalog object breakdown: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze catalog object breakdown: {e}")
 
 @router.get("/trajectory_uncertainty")
 async def get_trajectory_uncertainty(satellite_id: str, db = Depends(get_db)):

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useConjunctionStore } from '../store/useConjunctionStore';
 import api from '../api/axios';
+import { useSystemStore } from '../store/useSystemStore';
 import {
   TrendingUp,
   AlertTriangle,
@@ -39,6 +40,7 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
   
   // Zustand Subscription
   const activeConjunctionId = useConjunctionStore((s) => s.activeConjunctionId);
+  const liveKesslerIndex = useSystemStore((s) => s.kesslerIndex);
 
   // =========================================================================
   // CHART 1: RISK TIMELINE (AreaChart) [Dynamic Fetch]
@@ -69,8 +71,13 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
     
     api.get(`/analytics/risk_timeline?hours=${hours}`)
       .then((res: any) => {
-        if (Array.isArray(res) && res.length > 0) {
-          setRiskTimelineData(res);
+        const raw = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        if (raw.length > 0) {
+          const normalized = raw.map((pt: any) => ({
+            time: pt.time ?? (pt.timestamp ? pt.timestamp.slice(11, 16) + ' UTC' : ''),
+            score: pt.score ?? pt.max_risk_score ?? 0
+          }));
+          setRiskTimelineData(normalized);
         } else {
           setRiskTimelineData(simulatedTimeline[timeRange]);
         }
@@ -133,26 +140,20 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
   };
 
   useEffect(() => {
+    const fallbackBreakdown = [
+      { name: "Debris-Debris", value: 45 },
+      { name: "Debris-Payload", value: 32 },
+      { name: "Payload-Payload", value: 16 },
+      { name: "Rocket-Other", value: 7 }
+    ];
     api.get('/analytics/object_type_breakdown')
       .then((res: any) => {
-        if (Array.isArray(res) && res.length > 0) {
-          setObjectBreakdown(res);
-        } else {
-          setObjectBreakdown([
-            { name: "Debris-Debris", value: 45 },
-            { name: "Debris-Payload", value: 32 },
-            { name: "Payload-Payload", value: 16 },
-            { name: "Rocket-Other", value: 7 }
-          ]);
-        }
+        const nonZero = Array.isArray(res) ? res.filter((r: any) => (r.value ?? 0) > 0) : [];
+        const hasUsefulData = nonZero.length >= 2;
+        setObjectBreakdown(hasUsefulData ? res : fallbackBreakdown);
       })
       .catch(() => {
-        setObjectBreakdown([
-          { name: "Debris-Debris", value: 45 },
-          { name: "Debris-Payload", value: 32 },
-          { name: "Payload-Payload", value: 16 },
-          { name: "Rocket-Other", value: 7 }
-        ]);
+        setObjectBreakdown(fallbackBreakdown);
       });
   }, []);
 
@@ -178,12 +179,23 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
   useEffect(() => {
     api.get('/analytics/kessler_trend')
       .then((res: any) => {
-        if (Array.isArray(res) && res.length > 0) {
-          setKesslerTrendData(res);
+        const data = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        if (data.length > 0) {
+          setKesslerTrendData(data);
+        } else {
+          setKesslerTrendData([
+            { day: 'Mon', risk: 18 }, { day: 'Tue', risk: 24 }, { day: 'Wed', risk: 31 },
+            { day: 'Thu', risk: 29 }, { day: 'Fri', risk: 38 }, { day: 'Sat', risk: 45 },
+            { day: 'Sun', risk: 52 }
+          ]);
         }
       })
       .catch(() => {
-        setKesslerTrendData([]);
+        setKesslerTrendData([
+          { day: 'Mon', risk: 18 }, { day: 'Tue', risk: 24 }, { day: 'Wed', risk: 31 },
+          { day: 'Thu', risk: 29 }, { day: 'Fri', risk: 38 }, { day: 'Sat', risk: 45 },
+          { day: 'Sun', risk: 52 }
+        ]);
       });
   }, []);
 
@@ -361,62 +373,10 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
         </div>
       </div>
 
-      {/* Grid wrapper for side-by-side charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        
-        {/* ========================================================================= */}
-        {/* CHART 3: OBJECT TYPE PAIRS (PieChart with custom colors) */}
-        {/* ========================================================================= */}
-        <div className="bg-slate-950/60 border border-cyan-950/15 p-3 rounded-lg space-y-2 flex flex-col justify-between">
-          <div className="leading-tight">
-            <span className="text-[10px] font-display font-medium text-slate-200 block uppercase tracking-wider">
-              OBJECT TYPE PAIRS
-            </span>
-            <span className="text-[8px] font-mono text-slate-500 block">
-              Proportion of debris vs payload collision encounters
-            </span>
-          </div>
-
-          <div className="h-28 w-full flex items-center justify-center bg-[#020509] rounded border border-slate-900/60 p-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={objectBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={renderCustomizedLabel}
-                  outerRadius={45}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {objectBreakdown.map((entry, index) => {
-                    const color = PIE_COLORS[entry.name] || '#cbd5e1';
-                    return <Cell key={`cell-${index}`} fill={color} />;
-                  })}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{ background: '#090d16', border: '1px solid #1e293b', fontSize: '8px', fontFamily: 'monospace' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Elegant Custom Monospace Grid Legend */}
-          <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-905 font-mono text-[7px] text-slate-400">
-            {objectBreakdown.map((entry) => (
-              <div key={entry.name} className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: PIE_COLORS[entry.name] }} />
-                <span className="truncate uppercase">{entry.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* CHART 4: KESSLER RISK INDEX (7 Day Trend LineChart + High Risk line) */}
-        {/* ========================================================================= */}
-        <div className="bg-slate-950/60 border border-cyan-950/15 p-3 rounded-lg space-y-2 flex flex-col justify-between">
+      {/* ========================================================================= */}
+      {/* CHART 4: KESSLER RISK INDEX (7 Day Trend LineChart + High Risk line) */}
+      {/* ========================================================================= */}
+      <div className="bg-slate-950/60 border border-cyan-950/15 p-3 rounded-lg space-y-2 flex flex-col justify-between">
           <div className="leading-tight">
             <span className="text-[10px] font-display font-medium text-slate-200 block uppercase tracking-wider">
               KESSLER INDEX — 7D
@@ -430,7 +390,7 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={kesslerTrendData} margin={{ top: 5, right: 5, left: -30, bottom: 2 }}>
                 <XAxis dataKey="day" stroke="#475569" fontSize={8} fontFamily="monospace" tickLine={false} />
-                <YAxis stroke="#475569" fontSize={8} fontFamily="monospace" tickLine={false} domain={[0, 80]} />
+                <YAxis stroke="#475569" fontSize={8} fontFamily="monospace" tickLine={false} domain={[0, (dataMax: number) => Math.max(Math.ceil(dataMax * 1.5), 5)]} />
                 <RechartsTooltip
                   contentStyle={{ background: '#090d16', border: '1px solid #1e293b', fontSize: '9px', fontFamily: 'monospace' }}
                 />
@@ -440,6 +400,14 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
                   strokeDasharray="2 2"
                   label={{ value: 'HIGH THRESH', fill: '#ef4444', fontSize: 6.5, fontFamily: 'monospace', position: 'top' }} 
                 />
+                {liveKesslerIndex > 0 && (
+                  <ReferenceLine
+                    y={liveKesslerIndex}
+                    stroke="#22d3ee"
+                    strokeDasharray="3 3"
+                    label={{ value: `LIVE ${liveKesslerIndex.toFixed(1)}`, fill: '#22d3ee', fontSize: 6, fontFamily: 'monospace', position: 'insideBottomRight' }}
+                  />
+                )}
                 <Line 
                   type="monotone" 
                   dataKey="risk" 
@@ -456,8 +424,6 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
             Approaching High Risk critical threshold boundary
           </div>
         </div>
-
-      </div>
 
       {/* ========================================================================= */}
       {/* BOTTOM ACTION: SIMULATE KESSLER CASCADE ELEMENT */}

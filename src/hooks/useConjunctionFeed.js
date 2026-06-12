@@ -5,11 +5,12 @@ import { useSystemStore } from '../store/useSystemStore.js'
 
 export function useConjunctionFeed() {
   const [loading, setLoading] = useState(true)
-  const setConjunctions = useConjunctionStore((s) => s.setConjunctions)
-  const setActiveConjunctionCount = useSystemStore((s) => s.setActiveConjunctionCount)
 
   useEffect(() => {
     let active = true
+    // Access store actions directly (stable references, no selector churn)
+    const setConjunctions = useConjunctionStore.getState().setConjunctions;
+    const setActiveConjunctionCount = useSystemStore.getState().setActiveConjunctionCount;
 
     const fetchFeedAndStats = async () => {
       try {
@@ -47,7 +48,7 @@ export function useConjunctionFeed() {
       active = false
       clearInterval(intervalId)
     }
-  }, [setConjunctions, setActiveConjunctionCount])
+  }, [])
 
   return { loading }
 }

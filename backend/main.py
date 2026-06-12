@@ -86,6 +86,25 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed establishing scheduler queues: {sched_err}", exc_info=True)
         
     logger.info("------ ORBIT SENTINEL ONLINE ------")
+    # Write startup audit entry so the log is never empty on first load
+    try:
+        from backend.db import audit_repo
+        from backend.db.mongo_client import get_db as get_db_func
+        from datetime import datetime, timezone
+        db = get_db_func()
+        if db is not None:
+            await audit_repo.append_audit_entry(db, {
+                "timestamp": datetime.now(timezone.utc),
+                "action_type": "SYSTEM_STARTUP",
+                "actor": "ORBIT_SENTINEL_AUTONOMOUS",
+                "outcome": "SUCCESS",
+                "severity": "INFO",
+                "details": "Orbit Sentinel system initialized. Sentinel active.",
+                "notes": "Backend startup complete."
+            })
+    except Exception:
+        pass
+
     yield
     
     # 5. Safe, clean shutdown and garbage collection

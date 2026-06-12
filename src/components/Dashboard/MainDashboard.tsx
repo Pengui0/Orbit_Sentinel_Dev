@@ -78,6 +78,7 @@ export default function MainDashboard() {
   });
 
   const [auditLogCollapsed, setAuditLogCollapsed] = useState(true);
+  const [satelliteSearch, setSatelliteSearch] = useState('');
 
   const systemRisk = activeConjunctions.some((c) => c.status === 'CRITICAL')
     ? 'CRITICAL'
@@ -252,7 +253,7 @@ export default function MainDashboard() {
                         {activeSelectedSatellite.name}
                       </h3>
                       <p className="font-mono text-[8.5px] text-slate-500 uppercase tracking-widest mt-0.5">
-                        OPERATED BY: {activeSelectedSatellite.owner || 'N/A'}
+                        OPERATED BY: {activeSelectedSatellite.owner && activeSelectedSatellite.owner !== 'N/A' ? activeSelectedSatellite.owner : 'N/A'}
                       </p>
 
                       {/* Hardware details Grid */}
@@ -329,28 +330,39 @@ export default function MainDashboard() {
                 </div>
 
                 {/* Right Cinematic Overlay Links to scroll satellite array */}
-                <div className="absolute bottom-16 right-6 z-20 pointer-events-auto bg-[#030713]/85 backdrop-blur-md border border-[#151f38]/60 p-3.5 rounded shadow-xl w-64 max-h-56 overflow-y-auto font-mono text-[9px]">
+                <div className="absolute bottom-16 right-6 z-20 pointer-events-auto bg-[#030713]/85 backdrop-blur-md border border-[#151f38]/60 p-3.5 rounded shadow-xl w-64 max-h-72 overflow-y-auto font-mono text-[9px]">
                   <div className="text-[10px] font-bold text-cyan-400 mb-2 border-b border-[#142340] pb-1 uppercase">
                     🔭 ORBITING ASSETS ({satellitePositions.length})
                   </div>
+                  <input
+                    type="text"
+                    value={satelliteSearch}
+                    onChange={(e) => setSatelliteSearch(e.target.value)}
+                    placeholder="Search satellites..."
+                    className="w-full mb-2 px-2 py-1 bg-[#040710] border border-[#142340] rounded text-[9px] text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 uppercase"
+                  />
                   <div className="space-y-1">
-                    {(Array.isArray(satellitePositions) ? satellitePositions : []).map((sat: any) => {
-                      const id = sat.id || sat.noradId || sat.norad_id;
-                      const isActive = selectedSatelliteId === id;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setSelectedSatellite(isActive ? null : id)}
-                          className={`w-full text-left px-2 py-1 rounded transition-colors uppercase truncate block cursor-pointer ${
-                            isActive
-                              ? 'bg-cyan-500/20 text-cyan-400 font-black border border-cyan-500/30'
-                              : 'text-slate-400 hover:bg-[#060b19] border border-transparent hover:text-white'
-                          }`}
-                        >
-                          ⚙️ {sat.name}
-                        </button>
-                      );
-                    })}
+                    {(Array.isArray(satellitePositions) ? satellitePositions : [])
+                      .filter((sat: any) =>
+                        (sat.name || '').toLowerCase().includes(satelliteSearch.toLowerCase())
+                      )
+                      .map((sat: any) => {
+                        const id = sat.id || sat.noradId || sat.norad_id;
+                        const isActive = selectedSatelliteId === id;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => setSelectedSatellite(isActive ? null : id)}
+                            className={`w-full text-left px-2 py-1 rounded transition-colors uppercase truncate block cursor-pointer ${
+                              isActive
+                                ? 'bg-cyan-500/20 text-cyan-400 font-black border border-cyan-500/30'
+                                : 'text-slate-400 hover:bg-[#060b19] border border-transparent hover:text-white'
+                            }`}
+                          >
+                            ⚙️ {sat.name}
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               </>

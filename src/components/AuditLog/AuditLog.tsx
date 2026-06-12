@@ -89,8 +89,12 @@ export default function AuditLog() {
         let items = [];
         if (Array.isArray(res)) {
           items = res;
+        } else if (res && Array.isArray(res.entries)) {
+          items = res.entries;
         } else if (res && Array.isArray(res.data)) {
           items = res.data;
+        } else if (res && Array.isArray(res.logs)) {
+          items = res.logs;
         } else if (res && Array.isArray(res.items)) {
           items = res.items;
         }

@@ -3,12 +3,12 @@ import { motion } from "motion/react";
 import { Shield, Target, Zap, Server, Activity, Database, Cpu, Rocket, ChevronDown, CheckCircle2, AlertTriangle, Layers, Github, Radio, Users, Timer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const bg1 = "/assets/bg1.png";
-const bg2 = "/assets/bg2.png";
-const bg3 = "/assets/bg3.png";
-const bg4 = "/assets/bg4.png";
-const bg5 = "/assets/bg5.png";
-const bgFooter = "/assets/bgFooter.png";
+const bg1 = "../assets/bg1.png";
+const bg2 = "../assets/bg2.png";
+const bg3 = "../assets/bg3.png";
+const bg4 = "../assets/bg4.png";
+const bg5 = "../assets/bg5.png";
+const bgFooter = "../assets/bgFooter.png";
 
 import type { Variants } from "motion/react";
 

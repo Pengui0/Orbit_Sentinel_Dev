@@ -252,9 +252,7 @@ export default function MainDashboard() {
                       <h3 className="font-mono text-base font-extrabold text-white uppercase tracking-tight flex items-center gap-1.5">
                         {activeSelectedSatellite.name}
                       </h3>
-                      <p className="font-mono text-[8.5px] text-slate-500 uppercase tracking-widest mt-0.5">
-                        OPERATED BY: {activeSelectedSatellite.owner && activeSelectedSatellite.owner !== 'N/A' ? activeSelectedSatellite.owner : 'N/A'}
-                      </p>
+                      
 
                       {/* Hardware details Grid */}
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-[#142340]/40 font-mono text-[9px]">

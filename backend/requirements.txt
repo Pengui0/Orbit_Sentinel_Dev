@@ -2,12 +2,12 @@ fastapi==0.111.0
 uvicorn[standard]==0.29.0
 # MongoDB (optional — app auto-falls back to TinyDB if unavailable)
 motor==3.4.0
-pymongo==4.7.1
+pymongo>=4.0.0
 # TinyDB — zero-setup file-based DB (used when USE_TINYDB=true or MongoDB unreachable)
 tinydb>=4.8.0
 sgp4==2.22
 numpy==1.26.4
-scipy==1.13.0
+scipy>=1.10.0
 scikit-learn==1.4.2
 torch==2.3.0
 stable-baselines3==2.3.0

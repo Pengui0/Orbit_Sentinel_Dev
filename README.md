@@ -50,6 +50,8 @@ This is not a prototype. Every module — propagation, detection, probability co
 ---
 
 ## 🖥️ Dashboard Features
+### Landing Page
+![Landing Page](docs/screenshots/landing.png)
 
 ### Cinematic Telemetry View
 Lock onto any orbiting satellite and get a full telemetry readout: NORAD catalog ID, inclination, apogee/perigee, velocity, live lat/lon/alt propagated in real time. Click any dot on the globe.

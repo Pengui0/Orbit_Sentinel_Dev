@@ -119,11 +119,7 @@ export default function MLPanel({ onAddLog }: MLPanelProps) {
   };
 
   // ─── SUB-SECTION 3: MARL ─────────────────────────────────────────────────
-  const [agents, setAgents] = useState<any[]>([
-    { satellite: 'TERRA SAR X', episodes: 12400, reward: 3.72, trend: 'up' },
-    { satellite: 'TANDEM X', episodes: 9800, reward: 2.95, trend: 'up' },
-    { satellite: 'SENTINEL-1A', episodes: 7200, reward: 1.44, trend: 'down' },
-  ]);
+  const [agents, setAgents] = useState<any[]>([]);
   const [rlCurve, setRlCurve] = useState<{episode:number;reward:number}[]>([]);
 
   const fetchMarlAgents = () => {

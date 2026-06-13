@@ -11,7 +11,10 @@ Reward design follows CARA/JSC operational criteria:
 
 import numpy as np
 import gymnasium as gym
-from stable_baselines3 import PPO
+try:
+    from stable_baselines3 import PPO
+except ImportError:
+    PPO = None
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 from stable_baselines3.common.monitor import Monitor

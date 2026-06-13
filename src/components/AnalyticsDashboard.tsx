@@ -225,24 +225,12 @@ export default function AnalyticsDashboard({ onAddLog }: AnalyticsDashboardProps
         });
         onAddLog(`CASCADE RESULT COMPLETED: Identified ${response.debris} debris items and ${response.conjunctions} secondary impacts.`, "ALERT");
       } else {
-        // Safe mock modeling values if offline/disconnected
-        const debrisCount = Math.floor(600 + Math.random() * 800);
-        const conjCount = Math.floor(15 + Math.random() * 25);
-        setSimResult({
-          debris: debrisCount,
-          conjunctions: conjCount
-        });
-        onAddLog(`CASCADE RESULT COMPLETED: Simulated collision produced ${debrisCount} pieces & ${conjCount} secondary risks.`, "ALERT");
+        setSimResult({ debris: 0, conjunctions: 0 });
+        onAddLog(`CASCADE SIM: Backend offline — select an active conjunction first to run a live simulation.`, "WARNING");
       }
     } catch (err) {
-      // In case of 404 or backend failure, generate gorgeous results
-      const debrisCount = Math.floor(582 + Math.random() * 450);
-      const conjCount = Math.floor(12 + Math.random() * 18);
-      setSimResult({
-        debris: debrisCount,
-        conjunctions: conjCount
-      });
-      onAddLog(`CASCADE RESULT COMPLETED: Sim projected ${debrisCount} fragmented bodies and ${conjCount} secondary hazard curves.`, "ALERT");
+      setSimResult({ debris: 0, conjunctions: 0 });
+      onAddLog(`CASCADE SIM FAILED: No active conjunction selected or backend unavailable.`, "WARNING");
     } finally {
       setSimLoading(false);
     }

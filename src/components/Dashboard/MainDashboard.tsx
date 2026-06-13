@@ -65,7 +65,7 @@ export default function MainDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [models, setModels] = useState<MLModelStats[]>(INITIAL_ML_MODELS);
+  // models state removed — ML metrics fetched live in MLPanel directly
 
   const [leftTab, setLeftTab] = useState<'CONJUNCTIONS' | 'ML_STATUS'>('CONJUNCTIONS');
   const [rightTab, setRightTab] = useState<'MANEUVER' | 'ANALYTICS'>('MANEUVER');

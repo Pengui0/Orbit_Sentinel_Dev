@@ -1,15 +1,15 @@
+--only-binary=scipy,numpy
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
-# MongoDB (optional — app auto-falls back to TinyDB if unavailable)
 motor==3.4.0
 pymongo>=4.0.0
-# TinyDB — zero-setup file-based DB (used when USE_TINYDB=true or MongoDB unreachable)
 tinydb>=4.8.0
 sgp4==2.22
 numpy==1.26.4
 scipy==1.11.4
 scikit-learn==1.4.2
---extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.3.0+cpu
 stable-baselines3==2.3.0
 gymnasium==0.29.1

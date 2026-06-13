@@ -18,6 +18,7 @@
 [![Three.js](https://img.shields.io/badge/Three.js-WebGL-black?style=for-the-badge&logo=three.js)](https://threejs.org)
 [![PyTorch](https://img.shields.io/badge/PyTorch-LSTM-EE4C2C?style=for-the-badge&logo=pytorch)](https://pytorch.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![Physics Tests](https://github.com/Pengui0/Orbit_Sentinel_Dev/actions/workflows/test.yml/badge.svg)](https://github.com/Pengui0/Orbit_Sentinel_Dev/actions/workflows/test.yml)
 
 ---
 

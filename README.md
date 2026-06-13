@@ -53,6 +53,7 @@ This is not a prototype. Every module — propagation, detection, probability co
 
 ### Cinematic Telemetry View
 Lock onto any orbiting satellite and get a full telemetry readout: NORAD catalog ID, inclination, apogee/perigee, velocity, live lat/lon/alt propagated in real time. Click any dot on the globe.
+![Cinematic View](docs/screenshots/cinematic.png)
 
 ### Conjunction Feed (Left Panel)
 Live-ranked list of active close-approach events. Each card shows:
@@ -61,6 +62,7 @@ Live-ranked list of active close-approach events. Each card shows:
 - Chan Pc value with risk classification (LOW / HIGH / CRITICAL)
 - One-click CDM download (CCSDS 508.0 format)
 - Trigger Autonomous Response button
+![Live Dashboard](docs/screenshots/dashboard.png)
 
 ### ML Status Panel
 - **ANN Collision Probability** — TRAINED badge, live precision/recall/F1 metrics (balanced eval), input feature list, risk comparison chart (Chan Formula vs ANN Prediction)
@@ -68,6 +70,7 @@ Live-ranked list of active close-approach events. Each card shows:
 - **PPO Training Convergence** — Live reward curve chart from training run (last 200 episodes)
 - **Pipeline Benchmarks** — F1/status for ANN, LSTM, RL Agent vs naive threshold baseline
 - **MARL Agent Status** — Active agent count, per-agent reward and planned Δv telemetry
+![Ml Status Panel](docs/screenshots/ML.png)
 
 ### Maneuver Panel (Right Panel)
 When a conjunction is selected:
@@ -76,12 +79,18 @@ When a conjunction is selected:
 - Post-maneuver secondary conjunction check results
 - TRIGGER AUTONOMOUS RESPONSE button (fires MARL coordinator)
 - Webhook payload viewer
+![Autonomous Response](docs/screenshots/autonomous_response.png)
+
+### Historical Validation — Iridium 33 / Cosmos 2251 (Feb 10, 2009)
+![Iridium Detection Windows](docs/screenshots/iridium_t72.png)
+![Iridium T-0 Collision](docs/screenshots/iridium_t0.png)
 
 ### Analytics Dashboard
 - Risk timeline (24h–168h window, max risk score per hour)
 - Altitude heatmap (200–2000km in 100km bands, conjunction density)
 - Object type breakdown (DEBRIS×DEBRIS / DEBRIS×PAYLOAD / PAYLOAD×PAYLOAD)
 - Kessler Risk Index gauge with trend
+
 
 ### System Security Audit Log
 Collapsible bottom strip. Every autonomous decision, operator override, TLE refresh, and maneuver trigger is timestamped and logged. Attempts real CelesTrak SOCRATES data, falls back to live backend status.

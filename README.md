@@ -96,6 +96,7 @@ When a conjunction is selected:
 
 ### System Security Audit Log
 Collapsible bottom strip. Every autonomous decision, operator override, TLE refresh, and maneuver trigger is timestamped and logged. Attempts real CelesTrak SOCRATES data, falls back to live backend status.
+![System Security Audit Log](docs/screenshots/audit.png)
 
 ---
 

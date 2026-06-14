@@ -326,6 +326,10 @@ orbit-sentinel/
 ### Option A: No Docker, No MongoDB (Fastest)
 
 ```bash
+# 0. Clone the repository
+git clone https://github.com/Pengui0/Orbit_Sentinel_Dev.git
+cd Orbit_Sentinel_Dev
+
 # 1. Install backend dependencies
 pip install -r backend/requirements.txt
 

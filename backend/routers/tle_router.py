@@ -202,6 +202,19 @@ async def get_tle_status(db = Depends(get_db)):
     except Exception:
         pass
 
+    # Fallback — read last_updated from satellites (always written during ingestion)
+    if not last_pull_time:
+        try:
+            sats = await db["satellites"].find({}).sort("last_updated", -1).to_list(length=1)
+            if sats:
+                lu = sats[0].get("last_updated")
+                if isinstance(lu, datetime):
+                    last_pull_time = lu.isoformat()
+                elif isinstance(lu, str):
+                    last_pull_time = lu
+        except Exception:
+            pass
+
     # 2. Object count
     try:
         object_count = await db["satellites"].count_documents({})

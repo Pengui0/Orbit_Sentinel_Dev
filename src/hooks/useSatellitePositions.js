@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getCurrentPositions } from '../api/tleApi.js'
 import { useGlobeStore } from '../store/useGlobeStore.js'
 
 export function useSatellitePositions() {
   const [loading, setLoading] = useState(true)
-  const setSatellitePositions = useGlobeStore((s) => s.setSatellitePositions)
+  const loadingRef = useRef(true)
 
   useEffect(() => {
     let active = true
@@ -13,12 +13,17 @@ export function useSatellitePositions() {
       try {
         const positions = await getCurrentPositions()
         if (active) {
-          setSatellitePositions(positions)
-          setLoading(false)
+          // Access store directly — avoids store reference in dependency array
+          useGlobeStore.getState().setSatellitePositions(positions)
+          if (loadingRef.current) {
+            loadingRef.current = false
+            setLoading(false)
+          }
         }
       } catch (err) {
         console.error('Failed to pull current propagated positions:', err)
-        if (active) {
+        if (active && loadingRef.current) {
+          loadingRef.current = false
           setLoading(false)
         }
       }
@@ -26,13 +31,14 @@ export function useSatellitePositions() {
 
     fetchPositions()
 
-    const intervalId = setInterval(fetchPositions, 30000)
+    // 60s is enough — SGP4 positions change slowly, no need for 30s hammering
+    const intervalId = setInterval(fetchPositions, 60000)
 
     return () => {
       active = false
       clearInterval(intervalId)
     }
-  }, [setSatellitePositions])
+  }, []) // empty deps — runs once, stable forever
 
   return { loading }
 }

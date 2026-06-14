@@ -18,6 +18,9 @@ export default function StatsBar({ onAddLog }: StatsBarProps) {
   const systemStatus = useSystemStore((s) => s.systemStatus);
   const kesslerIndex = useSystemStore((s) => s.kesslerIndex);
   const setKesslerIndex = useSystemStore((s) => s.setKesslerIndex);
+  const setTleStatus = useSystemStore((s) => s.setTleStatus);
+  const setTleStatusRef = React.useRef(setTleStatus);
+  React.useEffect(() => { setTleStatusRef.current = setTleStatus; }, [setTleStatus]);
 
   // HTTP fallback: poll KRI from analytics if WebSocket hasn't set it
   React.useEffect(() => {
@@ -186,17 +189,39 @@ export default function StatsBar({ onAddLog }: StatsBarProps) {
   const handleForceRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    onAddLog("TLE synchronizer triggered manually. Checking ground radars...", "INFO");
+    onAddLog("TLE synchronizer triggered manually. Fetching from CelesTrak...", "INFO");
 
     try {
       await triggerTleRefresh();
-      // Fetch status update and refresh zustand
-      const freshStatus = await getTleStatus();
-      useSystemStore.getState().setTleStatus(freshStatus);
-      onAddLog("TLE status pull complete. Space-Track orbital coordinates are current.", "INFO");
+      onAddLog("TLE ingestion started. Polling for completion...", "INFO");
+
+      // Poll every 4s up to 10 attempts (40s total)
+      let freshStatus = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise((res) => setTimeout(res, 4000));
+        try {
+          const s = await getTleStatus() as any;
+          if (s && (s.last_pull_time || s.last_pull)) {
+            freshStatus = s;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (freshStatus) {
+        setTleStatusRef.current({
+          last_pull: freshStatus.last_pull_time || freshStatus.last_pull || new Date().toISOString(),
+          object_count: freshStatus.object_count || 0,
+          next_pull_minutes: freshStatus.next_scheduled_pull || 10,
+        });
+        onAddLog(`TLE sync complete. ${freshStatus.object_count || 0} objects tracked.`, "INFO");
+      } else {
+        setTleStatusRef.current({ last_pull: new Date().toISOString() });
+        onAddLog("TLE refresh triggered. Ingestion running in background.", "INFO");
+      }
     } catch (err) {
       console.error(err);
-      onAddLog("TLE sync request failed or timed out. Check telemetry status.", "WARNING");
+      onAddLog("TLE sync failed. Check backend is running on port 8000.", "WARNING");
     } finally {
       setRefreshing(false);
     }

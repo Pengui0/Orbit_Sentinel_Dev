@@ -212,6 +212,16 @@ class TinyCursor:
                 v = d.get(self._sort_key)
                 if v is None:
                     return 0
+                # Handle datetime strings (ISO format)
+                if isinstance(v, str):
+                    try:
+                        from datetime import datetime
+                        return datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
+                    except Exception:
+                        return 0
+                # Handle datetime objects
+                if hasattr(v, 'timestamp'):
+                    return v.timestamp()
                 try:
                     return float(v)
                 except (TypeError, ValueError):

@@ -358,12 +358,11 @@ async def run_tle_ingestion_job(db: AsyncIOMotorDatabase) -> Dict[str, Any]:
             "source": "failed"
         }
 
-    # 5. Save Fresh database snapshot (METADATA ONLY)
-    if source == "live":
-        try:
-            await store_tle_snapshot(db, len(merged_list), source)
-        except Exception as e:
-            logger.error(f"Could not archive live database snapshot: {e}")
+    # 5. Save snapshot always — ensures /tle/status always has a timestamp
+    try:
+        await store_tle_snapshot(db, len(merged_list), source)
+    except Exception as e:
+        logger.error(f"Could not archive database snapshot: {e}")
 
     # 6. Bulk synchronize
     upserted_count = await upsert_satellite_catalogue(db, merged_list)

@@ -72,12 +72,13 @@ class SentinelScheduler:
         
         tle_interval = getattr(settings, "TLE_REFRESH_INTERVAL_MINUTES", 10)
         
-        # 1. TLE Ingestion (Starts immediately)
+        # 1. TLE Ingestion — run immediately on startup, then every interval
         self.scheduler.add_job(
             self.job_ingest_tles,
             IntervalTrigger(minutes=tle_interval),
             id="job_ingest_tles",
-            replace_existing=True
+            replace_existing=True,
+            next_run_time=datetime.now()  # fires immediately on startup
         )
         
         # 2. Conjunction Sweep (Offset by 3 minutes to follow ingestion completion)

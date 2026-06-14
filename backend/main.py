@@ -158,7 +158,20 @@ async def health_check(request: Request):
             elif isinstance(fetched, str):
                 last_tle_pull = fetched
     except Exception as e:
-        logger.debug(f"Failed retrieving last TLE snapshot update timestamp: {e}")
+        logger.debug(f"Failed retrieving last TLE snapshot: {e}")
+
+    # Fallback — read last_updated from satellites collection
+    if not last_tle_pull:
+        try:
+            sats = await db["satellites"].find({}).sort("last_updated", -1).to_list(length=1)
+            if sats:
+                lu = sats[0].get("last_updated")
+                if isinstance(lu, datetime):
+                    last_tle_pull = lu.isoformat()
+                elif isinstance(lu, str):
+                    last_tle_pull = lu
+        except Exception:
+            pass
         
     # 2. Extract collection totals
     try:

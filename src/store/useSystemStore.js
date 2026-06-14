@@ -30,7 +30,7 @@ export const useSystemStore = create((set) => ({
     console.log('Health data received:', healthData)
     set({
       tleStatus: {
-        last_pull: healthData.last_tle_pull,
+        last_pull: healthData.last_tle_pull || healthData.last_pull_time || healthData.last_pull,
         object_count: healthData.total_objects_tracked || 0,
         next_pull_minutes: healthData.next_scheduled_pull ?? 10
       },

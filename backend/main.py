@@ -90,7 +90,6 @@ async def lifespan(app: FastAPI):
     try:
         from backend.db import audit_repo
         from backend.db.mongo_client import get_db as get_db_func
-        from datetime import datetime, timezone
         db = get_db_func()
         if db is not None:
             await audit_repo.append_audit_entry(db, {

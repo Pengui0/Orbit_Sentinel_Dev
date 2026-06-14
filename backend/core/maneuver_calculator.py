@@ -1,4 +1,3 @@
-# Required import alias as per prompt instruction: "numpy as np"
 import numpy as np
 
 import logging

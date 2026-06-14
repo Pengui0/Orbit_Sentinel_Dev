@@ -306,7 +306,7 @@ export default function StatsBar({ onAddLog }: StatsBarProps) {
           <span className="text-xs font-semibold text-cyan-300 tracking-tight">
             {lastSweepDurationS !== null
               ? `${lastSweepDurationS}s · ${lastSweepSatelliteCount.toLocaleString()} obj`
-              : <span className="text-slate-500 animate-pulse">PENDING…</span>
+              : <span className="text-slate-500 animate-pulse">SCANNING…</span>
             }
           </span>
         </div>

@@ -33,7 +33,9 @@ export function useWebSocket() {
         window.dispatchEvent(new CustomEvent('ws_message', { detail: msg }));
         
         if (msg.type === 'conjunction_update') {
-          useConjunctionStore.getState().setConjunctions(msg.conjunctions)
+          if (msg.newly_added > 0) {
+            useConjunctionStore.getState().setConjunctions(msg.conjunctions)
+          }
           if (msg.sweep_duration_s !== undefined) {
             useSystemStore.getState().setLastSweep(msg.sweep_duration_s, msg.satellites_scanned || 0)
           }

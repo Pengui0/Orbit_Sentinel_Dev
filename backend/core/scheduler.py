@@ -87,7 +87,21 @@ class SentinelScheduler:
             self.job_propagate_and_detect,
             IntervalTrigger(minutes=tle_interval, start_date=prop_start_date),
             id="job_propagate_and_detect",
-            replace_existing=True
+            replace_existing=True,
+            next_run_time=datetime.now()  # fires immediately on startup
+        )
+
+        # Broadcast initial sweep status so UI shows "RUNNING..." instead of "PENDING..."
+        asyncio.get_event_loop().call_soon(
+            lambda: asyncio.ensure_future(safe_broadcast({
+                "type": "system_stats",
+                "sweep_status": "RUNNING",
+                "timestamp": datetime_to_iso(utc_now()),
+                "last_sweep_satellite_count": 0,
+                "last_sweep_duration_s": None,
+                "kessler_index": 0,
+                "total_objects": 0,
+            }))
         )
         
         # 3. Fast-loop Threshold/Mitigation Checks
@@ -104,6 +118,7 @@ class SentinelScheduler:
         self.scheduler.add_job(self.job_cleanup_old_data, IntervalTrigger(days=1), id="job_cleanup_old_data")
         
         self.scheduler.start()
+        asyncio.ensure_future(self.job_propagate_and_detect())
         logger.info("SentinelScheduler activated with staggered pipeline offsets.")
 
     async def job_ingest_tles(self) -> None:
@@ -163,6 +178,7 @@ class SentinelScheduler:
                 "timestamp": datetime_to_iso(utc_now()),
                 "sweep_duration_s": sweep_duration_s,
                 "satellites_scanned": satellites_scanned,
+                "partial": True,
             })
         except Exception as exc:
             logger.error(f"Propagation loop error: {exc}")

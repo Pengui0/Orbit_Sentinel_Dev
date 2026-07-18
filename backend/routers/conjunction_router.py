@@ -7,6 +7,7 @@ from backend.core.conjunction_detector import ConjunctionEvent
 from backend.core.maneuver_calculator import compute_optimal_maneuver
 from backend.core.webhook_dispatcher import build_webhook_payload, simulate_webhook_dispatch
 from backend.core.sgp4_propagator import propagate_single
+from backend.utils.auth import verify_api_key
 
 router = APIRouter()
 
@@ -159,7 +160,7 @@ async def get_by_id(
         raise HTTPException(status_code=404, detail=f"Conjunction event {event_id} not found.")
     return apply_conjunction_adjustments(serialize_mongo_doc(conj))
 
-@router.post("/{event_id}/trigger_response")
+@router.post("/{event_id}/trigger_response", dependencies=[Depends(verify_api_key)])
 async def trigger_response(event_id: str, db = Depends(get_db)):
     """
     Manually deploy reinforcement learning mitigation actions regarding a critical warning threat.
@@ -280,7 +281,7 @@ async def trigger_response(event_id: str, db = Depends(get_db)):
         "status": "RESPONSE_TRIGGERED"
     }
 
-@router.post("/{event_id}/resolve")
+@router.post("/{event_id}/resolve", dependencies=[Depends(verify_api_key)])
 async def resolve_conjunction(
     event_id: str,
     maneuver_id: Optional[str] = None,

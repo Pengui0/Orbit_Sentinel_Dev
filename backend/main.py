@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio
 import contextlib
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -49,7 +49,13 @@ async def lifespan(app: FastAPI):
     pre-populates dry-run orbital catalogs, and flags up periodic check routines.
     """
     logger.info("Orbit Sentinel booting up...")
-    
+
+    if settings.WEBHOOK_SECRET == "changeme" or settings.API_KEY == "changeme":
+        logger.warning(
+            "SECURITY WARNING: WEBHOOK_SECRET/API_KEY are still default values. "
+            "Set real secrets in .env before any non-local deployment."
+        )
+
     # 1. Establish and secure database connection
     db_uri = os.environ.get("MONGODB_URI", settings.MONGODB_URI)
     db_name = os.environ.get("MONGODB_DB_NAME", settings.MONGODB_DB_NAME)
@@ -101,8 +107,8 @@ async def lifespan(app: FastAPI):
                 "details": "Orbit Sentinel system initialized. Sentinel active.",
                 "notes": "Backend startup complete."
             })
-    except Exception:
-        pass
+    except Exception as audit_err:
+        logger.error(f"Failed writing startup audit entry: {audit_err}", exc_info=True)
 
     yield
     
@@ -120,9 +126,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Orbit Sentinel", version="1.0.0", lifespan=lifespan)
 
 # CORS Middleware setup
+_dev_origins = ["http://localhost:5173", "http://localhost:3000"] if settings.ENV != "production" else []
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[settings.FRONTEND_URL, *_dev_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

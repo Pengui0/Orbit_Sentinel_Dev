@@ -10,6 +10,7 @@ from backend.ml.trajectory_lstm import lstm_predictor
 from backend.ml.marl_coordinator import marl_coordinator
 from backend.core.risk_scorer import compute_kessler_index
 from backend.config import settings
+from backend.utils.auth import verify_api_key
 
 router = APIRouter()
 
@@ -318,7 +319,7 @@ async def get_trajectory_uncertainty(satellite_id: str, db = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"LSTM prediction failed: {e}")
 
 
-@router.post("/predict_uncertainty")
+@router.post("/predict_uncertainty", dependencies=[Depends(verify_api_key)])
 async def post_predict_uncertainty(body: dict, db = Depends(get_db)):
     """POST version for on-demand LSTM run trigger."""
     satellite_id = body.get("satellite_id", "")
@@ -413,7 +414,7 @@ async def get_rl_training_curve():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read training curve: {e}")
 
-@router.post("/simulate_cascade")
+@router.post("/simulate_cascade", dependencies=[Depends(verify_api_key)])
 async def simulate_cascade_endpoint(
     req: CascadeRequest,
     db = Depends(get_db)
@@ -476,7 +477,7 @@ async def get_marl_agents():
     """
     return marl_coordinator.get_agent_status()
 
-@router.post("/ann/train")
+@router.post("/ann/train", dependencies=[Depends(verify_api_key)])
 async def retrain_ann_manually(db = Depends(get_db)):
     """
     Trigger manual retraining of the Collision Probability Artificial Neural Network classifier.
@@ -492,7 +493,7 @@ async def retrain_ann_manually(db = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger ANN retraining: {e}")
 
-@router.post("/lstm/train")
+@router.post("/lstm/train", dependencies=[Depends(verify_api_key)])
 async def retrain_lstm_manually(db = Depends(get_db)):
     """
     Trigger manual incremental retraining of the Trajectory Forecasting LSTM network.

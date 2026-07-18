@@ -2,12 +2,21 @@ import asyncio
 import json
 import os
 import logging
+from pathlib import Path
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def _resolve_binary_path() -> str:
+    path = Path(settings.RUST_SGP4_BINARY_PATH)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    return str(path)
+
 def is_rust_available() -> bool:
-    return os.path.exists(settings.RUST_SGP4_BINARY_PATH)
+    return os.path.exists(_resolve_binary_path())
 
 async def propagate_via_rust(satellites: list[dict], timestamps: list) -> dict:
     """
@@ -21,7 +30,7 @@ async def propagate_via_rust(satellites: list[dict], timestamps: list) -> dict:
         "timestamps": [t.isoformat() + "Z" for t in timestamps]
     })
     proc = await asyncio.create_subprocess_exec(
-        settings.RUST_SGP4_BINARY_PATH,
+        _resolve_binary_path(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE

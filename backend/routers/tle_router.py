@@ -7,6 +7,7 @@ from backend.db import satellite_repo
 from backend.core.tle_ingestion import run_tle_ingestion_job, get_cached_tles
 from backend.core.sgp4_propagator import propagate_single, propagate_current_positions
 from backend.core.scheduler import sentinel_scheduler
+from backend.utils.auth import verify_api_key
 
 router = APIRouter()
 
@@ -314,7 +315,7 @@ async def _run_tle_and_log(db):
             "notes": str(e)
         })
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(verify_api_key)])
 async def trigger_refresh_job(background_tasks: BackgroundTasks, db = Depends(get_db)):
     """
     Trigger standard CelesTrak and Supplemental satellite synchronization in the background.

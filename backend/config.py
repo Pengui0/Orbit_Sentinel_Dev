@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     
     # Event notification and webhooks
     WEBHOOK_SECRET: str = "changeme"
+    API_KEY: str = "changeme"
     
     # Scheduler and system options
     TLE_REFRESH_INTERVAL_MINUTES: int = 10
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
     
     # Cross-Origin resource sharing (CORS) security configuration
     FRONTEND_URL: str = "http://localhost:5173"
+    ENV: str = "development"
 
     # Pydantic configuration loading settings from '.env' file
     model_config = SettingsConfigDict(

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { INITIAL_CONJUNCTIONS, INITIAL_ML_MODELS, INITIAL_AUDIT_LOGS } from '../../data';
 import { ConjunctionEvent, MLModelStats, AuditLog as AuditLogType, Satellite } from '../../types';
 import StatsBar from '../StatsBar';
-import GlobeScene from '../GlobeScene';
+import { lazy, Suspense } from 'react';
 import ConjunctionFeed from '../ConjunctionPanel/ConjunctionFeed';
-import MLPanel from '../MLPanel';
+const GlobeScene = lazy(() => import('../GlobeScene'));
+const MLPanel = lazy(() => import('../MLPanel'));
 import ManeuverPanel from '../ManeuverPanel';
 import AnalyticsDashboard from '../AnalyticsDashboard';
 import AuditLog from '../AuditLog/AuditLog';
@@ -147,7 +148,11 @@ export default function MainDashboard() {
 
             {/* Left Contents Panel */}
             <div className="flex-1 overflow-y-auto">
-              {leftTab === 'CONJUNCTIONS' ? <ConjunctionFeed /> : <MLPanel onAddLog={(msg, sev) => console.log('[AUDIT]', sev, msg)} />}
+              {leftTab === 'CONJUNCTIONS' ? <ConjunctionFeed /> : (
+                <Suspense fallback={<div>Loading ML panel...</div>}>
+                  <MLPanel onAddLog={(msg, sev) => console.log('[AUDIT]', sev, msg)} />
+                </Suspense>
+              )}
             </div>
           </div>
         )}
@@ -185,14 +190,16 @@ export default function MainDashboard() {
 
           {/* Core scene window */}
           <div className="flex-1 min-h-0 relative">
-            <GlobeScene
-              conjunctions={activeConjunctions}
-              selectedConjunction={selectedConjunction}
-              onSelectConjunction={setSelectedConjunction}
-              onResetCamera={(fn) => { resetCameraRef.current = fn; }}
-              layers={layers}
-              setLayers={setLayers}
-            />
+            <Suspense fallback={<div>Loading globe...</div>}>
+              <GlobeScene
+                conjunctions={activeConjunctions}
+                selectedConjunction={selectedConjunction}
+                onSelectConjunction={setSelectedConjunction}
+                onResetCamera={(fn) => { resetCameraRef.current = fn; }}
+                layers={layers}
+                setLayers={setLayers}
+              />
+            </Suspense>
 
             {/* Cinematic Floating Head-up display (HUDs) */}
             {cinematicMode && (

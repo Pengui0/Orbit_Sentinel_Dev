@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, Field
 from backend.db.mongo_client import get_db
 from backend.db import audit_repo
+from backend.utils.auth import verify_api_key
 
 router = APIRouter()
 
@@ -69,7 +70,7 @@ async def get_logs_alias(
         "offset": res["offset"]
     }
 
-@router.post("/log")
+@router.post("/log", dependencies=[Depends(verify_api_key)])
 async def log_action_pydantic_api(
     entry: AuditEntry,
     db = Depends(get_db)
@@ -105,7 +106,7 @@ async def log_action_pydantic_api(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to append audit entry: {e}")
 
-@router.post("")
+@router.post("", dependencies=[Depends(verify_api_key)])
 async def log_action_legacy_api(
     action_type: str,
     details: str,

@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query, HTTPException
 from backend.db.mongo_client import get_db
 from backend.db import maneuver_repo
+from backend.utils.auth import verify_api_key
 
 router = APIRouter()
 
@@ -102,7 +103,7 @@ async def get_maneuver_verification(maneuver_id: str, db = Depends(get_db)):
         return {}
     return verification_result
 
-@router.post("/{maneuver_id}/verify")
+@router.post("/{maneuver_id}/verify", dependencies=[Depends(verify_api_key)])
 async def verify_maneuver(
     maneuver_id: str,
     success: bool = True,

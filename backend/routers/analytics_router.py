@@ -116,16 +116,23 @@ async def get_kessler_trend(db = Depends(get_db)):
             "risk_level": {"$in": ["CRITICAL", "HIGH"]}
         })
 
+        from backend.db.kessler_history_repo import get_recent_snapshots
+        real_snapshots = await get_recent_snapshots(7)
+
         for d in range(6, -1, -1):
             day_dt = now_dt - timedelta(days=d)
             day_key = day_dt.strftime("%Y-%m-%d")
-            if d == 0:
-                high_risk_count = live_high_risk_count
+            if day_key in real_snapshots:
+                # We actually recorded this day's live value — use the real number.
+                k_index = real_snapshots[day_key]
             else:
-                high_risk_count = day_counts.get(day_key, 0)
-            # Mirror the exact scheduler formula: base + surge, capped at 100
-            surge = min(high_risk_count * 2.0, 20.0)
-            k_index = round(min(base_kri + surge, 100.0), 2)
+                if d == 0:
+                    high_risk_count = live_high_risk_count
+                else:
+                    high_risk_count = day_counts.get(day_key, 0)
+                # Fallback estimate for days before snapshot recording existed.
+                surge = min(high_risk_count * 2.0, 20.0)
+                k_index = round(min(base_kri + surge, 100.0), 2)
             trend.append({
                 "date": day_key,
                 "day": day_dt.strftime("%a"),

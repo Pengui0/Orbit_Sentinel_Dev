@@ -227,6 +227,8 @@ class SentinelScheduler:
                 "risk_level": {"$in": ["CRITICAL", "HIGH"]}
             })
             kri = compute_kessler_index(high_risk_count, total_objects, debris_count)
+            from backend.db.kessler_history_repo import record_daily_snapshot
+            await record_daily_snapshot(kri)
             await safe_broadcast({
                 "type": "system_stats",
                 "total_objects": total_objects,

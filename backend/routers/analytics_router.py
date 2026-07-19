@@ -108,10 +108,21 @@ async def get_kessler_trend(db = Depends(get_db)):
         base_kri = min((debris_cnt / max(total_leo, 1)) * 100.0, 80.0)
 
         trend = []
+        # Today's point must match the live scheduler count exactly, not the
+        # TCA-windowed historical bucket, so the chart's last point never
+        # drifts from the "LIVE" reference line.
+        live_high_risk_count = await db["conjunctions"].count_documents({
+            "resolved": False,
+            "risk_level": {"$in": ["CRITICAL", "HIGH"]}
+        })
+
         for d in range(6, -1, -1):
             day_dt = now_dt - timedelta(days=d)
             day_key = day_dt.strftime("%Y-%m-%d")
-            high_risk_count = day_counts.get(day_key, 0)
+            if d == 0:
+                high_risk_count = live_high_risk_count
+            else:
+                high_risk_count = day_counts.get(day_key, 0)
             # Mirror the exact scheduler formula: base + surge, capped at 100
             surge = min(high_risk_count * 2.0, 20.0)
             k_index = round(min(base_kri + surge, 100.0), 2)

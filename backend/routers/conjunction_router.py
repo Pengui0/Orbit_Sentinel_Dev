@@ -160,6 +160,7 @@ async def get_by_id(
         raise HTTPException(status_code=404, detail=f"Conjunction event {event_id} not found.")
     return apply_conjunction_adjustments(serialize_mongo_doc(conj))
 
+
 @router.post("/{event_id}/trigger_response", dependencies=[Depends(verify_api_key)])
 async def trigger_response(event_id: str, db = Depends(get_db)):
     """

@@ -12,3 +12,5 @@ export const searchConjunctions = (q, dateFrom, dateTo) => api.get('/conjunction
     date_to: dateTo
   }
 })
+export const getConjunctionTrajectory = (eventId, windowMinutes = 20, steps = 41) =>
+  api.get(`/conjunctions/${eventId}/trajectory`, { params: { window_minutes: windowMinutes, steps } })

@@ -8,6 +8,7 @@ import RiskBadge from './RiskBadge';
 import { X, ShieldAlert, Sparkles, AlertTriangle, ArrowUpRight, Activity, Globe, CheckCircle, Flame, Server, Download } from 'lucide-react';
 import { useSystemStore } from '../../store/useSystemStore';
 import ComputationProgress from '../Dashboard/ComputationProgress';
+import { computeBPlane } from '../../utils/bplane';
 
 const MANEUVER_STEPS = [
   "Fetching state vectors from space asset registers",
@@ -75,6 +76,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
   const [maneuvering, setManeuvering] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [marlSuccess, setMarlSuccess] = useState(false);
+  const [hoveredBPlane, setHoveredBPlane] = useState(false);
 
   const demoMode = useSystemStore((s) => s.demoMode);
   const conjunctions = useConjunctionStore((s) => s.conjunctions);
@@ -196,7 +198,8 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
   // Metrics details parsing safely
   const missDistanceKm = data.miss_distance_km !== undefined 
     ? data.miss_distance_km 
-    : (data.missDistance !== undefined ? data.missDistance / 1000 : 1.25);
+    : (data.missDistance !== undefined ? data.missDistance / 1000 : null);
+  const hasMissDistance = missDistanceKm !== null && Number.isFinite(missDistanceKm);
 
   const tcaValue = data.tca_utc || data.tca;
   let formattedTca = 'N/A';
@@ -219,40 +222,40 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
     ? data.relative_velocity_kmps
     : (data.relativeVelocity !== undefined && data.relativeVelocity > 0)
       ? data.relativeVelocity
-      : (() => {
-          // Estimate from orbital mechanics: LEO relative velocity 0.1–14 km/s
-          const alt = data.altitude_km || 550;
-          const mu = 398600.4418;
-          const r = 6371 + alt;
-          return parseFloat((2 * Math.sqrt(mu / r) * Math.sin(Math.PI / 4)).toFixed(2));
-        })();
+      : null;
 
   const relVelocityLabel = formatRelativeSpeed(relVelocity);
 
   const colProb = data.collision_probability_chan !== undefined 
     ? data.collision_probability_chan 
-    : (data.riskProbability !== undefined ? data.riskProbability : 1.05e-5);
+    : (data.riskProbability !== undefined ? data.riskProbability : null);
 
   const altitude = data.altitude_km !== undefined 
     ? data.altitude_km 
-    : (data.satA?.alt !== undefined ? data.satA.alt : 520);
+    : (data.satA?.alt !== undefined ? data.satA.alt : null);
 
-  const riskScore = data.risk_score !== undefined 
-    ? data.risk_score 
-    : (riskLevel === 'CRITICAL' ? 88.421 : riskLevel === 'HIGH' ? 62.155 : 34.221);
+  const riskScore = data.risk_score !== undefined ? data.risk_score : null;
+
+  const staticBPlane = computeBPlane(
+    data.state_vector_at_tca_a || {},
+    data.state_vector_at_tca_b || {}
+  );
+
+  // Reference screening envelope — standard conjunction-screening radius (1 km)
+  const REFERENCE_KM = 1.0;
 
   // Object specifics columns
-  const typeA = data.object_type_a || data.satA?.type || 'PAYLOAD';
-  const typeB = data.object_type_b || data.satB?.type || 'DEBRIS';
+  const typeA = data.object_type_a || data.satA?.type || 'UNKNOWN';
+  const typeB = data.object_type_b || data.satB?.type || 'UNKNOWN';
 
-  const ownerA = data.satA?.owner || data.owner_a || 'SpaceX';
-  const ownerB = data.satB?.owner || data.owner_b || 'USSPACECOM';
+  const ownerA = data.satA?.owner || data.owner_a || null;
+  const ownerB = data.satB?.owner || data.owner_b || null;
 
   const cA = getCountryAndFlag(ownerA);
   const cB = getCountryAndFlag(ownerB);
 
-  const noradA = data.satA?.noradId || data.norad_id_a || '48212';
-  const noradB = data.satB?.noradId || data.norad_id_b || '36114';
+  const noradA = data.satA?.noradId || data.norad_id_a || 'N/A';
+  const noradB = data.satB?.noradId || data.norad_id_b || 'N/A';
 
   const findLiveSatelliteState = (noradId: string) => {
     if (!Array.isArray(satellitePositions)) return null;
@@ -280,15 +283,33 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
     : formatRelativeSpeed(liveRelativeVelocity);
   const liveRelativeVelocityTimestamp = liveStateA?.t || liveStateB?.t || null;
 
-  const criticA = data.criticality_a !== undefined ? data.criticality_a : 8.2;
-  const criticB = data.criticality_b !== undefined ? data.criticality_b : 2.5;
+  // Prefer a B-plane computed from the current propagated satellite stream
+  // (updates on every telemetry refresh) over the static TCA-only geometry,
+  // so the plot reflects real, moving orbital data instead of a frozen snapshot.
+  const liveBPlane = (liveStateA && liveStateB) ? computeBPlane(liveStateA, liveStateB) : null;
+  const bPlane = liveBPlane || staticBPlane;
+  const isLiveBPlane = !!liveBPlane;
+  const hasBPlaneData = !!bPlane;
+  const bXi = bPlane?.xi ?? 0;
+  const bEta = bPlane?.eta ?? 0;
+  const bMiss = bPlane?.missKm ?? (hasMissDistance ? (missDistanceKm as number) : REFERENCE_KM);
+  const bScale = 45 / Math.max(bMiss * 1.25, REFERENCE_KM * 1.25, 0.05);
+  const bPointX = 140 + bXi * bScale;
+  const bPointY = 60 - bEta * bScale;
+  const bRefRadiusPx = REFERENCE_KM * bScale;
 
-  // Determine miss distance color
-  let missDistanceColor = 'text-yellow-400';
-  if (missDistanceKm < 1.0) {
-    missDistanceColor = 'text-red-500 animate-pulse';
-  } else if (missDistanceKm >= 1.0 && missDistanceKm <= 3.0) {
-    missDistanceColor = 'text-orange-500';
+  const criticA = data.criticality_a !== undefined ? data.criticality_a : null;
+  const criticB = data.criticality_b !== undefined ? data.criticality_b : null;
+
+  // Determine miss distance color (real data only; neutral when unavailable)
+  let missDistanceColor = 'text-slate-500';
+  if (hasMissDistance) {
+    missDistanceColor = 'text-yellow-400';
+    if ((missDistanceKm as number) < 1.0) {
+      missDistanceColor = 'text-red-500 animate-pulse';
+    } else if ((missDistanceKm as number) >= 1.0 && (missDistanceKm as number) <= 3.0) {
+      missDistanceColor = 'text-orange-500';
+    }
   }
 
   // Handle high-tech simulation sequence on execute
@@ -462,7 +483,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Miss Distance</span>
               <span className={`text-base font-extrabold font-mono tracking-tight ${missDistanceColor}`}>
-                {missDistanceKm.toFixed(3)} km
+                {hasMissDistance ? `${(missDistanceKm as number).toFixed(3)} km` : 'N/A'}
               </span>
             </div>
 
@@ -499,7 +520,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Collision Probability (Pc)</span>
               <span className="text-xs font-black font-mono text-red-400">
-                {colProb.toExponential(3)}
+                {colProb !== null ? colProb.toExponential(3) : 'N/A'}
               </span>
             </div>
 
@@ -507,7 +528,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Trajectory Altitude</span>
               <span className="text-xs font-black font-mono text-slate-200">
-                {altitude.toFixed(0)} km
+                {altitude !== null ? `${altitude.toFixed(0)} km` : 'N/A'}
               </span>
             </div>
 
@@ -515,51 +536,85 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
             <div className="bg-slate-950/60 border border-cyan-950/20 p-2.5 rounded flex flex-col gap-0.5">
               <span className="text-[8px] font-mono text-slate-500 font-semibold uppercase">Threat Complexity Index</span>
               <span className="text-xs font-black font-mono text-cyan-400">
-                {riskScore.toFixed(4)}
+                {riskScore !== null ? riskScore.toFixed(4) : 'N/A'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* SECTION 4 — CLOSE APPROACH GEOMETRY (SVG VISUALIZATION) */}
+        {/* SECTION 4 — B-PLANE ENCOUNTER GEOMETRY (real relative-position projection) */}
         <div>
           <span className="text-[8px] font-mono text-slate-500 font-bold tracking-wider block mb-1.5 uppercase">
-            3D Intersection Geometry
+            B-Plane Encounter Geometry
           </span>
           <div className="bg-slate-950 border border-cyan-950/40 rounded p-2.5 relative flex flex-col items-center">
             <svg width="280" height="120" className="bg-[#05070f] rounded border border-cyan-950/10">
-              {/* Target Path A - Blue gradient vector line */}
-              <line x1="20" y1="25" x2="260" y2="95" stroke="#00D4FF" strokeWidth="1.5" strokeOpacity="0.8" />
-              {/* Debris Path B - Orange gradient vector line */}
-              <line x1="20" y1="95" x2="260" y2="25" stroke="#FF6B35" strokeWidth="1.5" strokeOpacity="0.8" />
-              
-              {/* Circular radar boundary orbits */}
-              <circle cx="140" cy="60" r="45" stroke="#102a45" strokeWidth="0.5" strokeDasharray="2,4" fill="none" />
-              <circle cx="140" cy="60" r="22" stroke="#102a45" strokeWidth="0.5" strokeDasharray="1,4" fill="none" />
+              {/* Reference screening envelope (1 km) */}
+              <circle cx="140" cy="60" r={bRefRadiusPx} stroke="#102a45" strokeWidth="0.5" strokeDasharray="2,4" fill="none" />
+              <circle cx="140" cy="60" r={bRefRadiusPx * 0.5} stroke="#102a45" strokeWidth="0.5" strokeDasharray="1,4" fill="none" />
 
-              {/* Connecting dashed delta line expressing miss metric */}
-              <line x1="130" y1="57" x2="150" y2="63" stroke="#ef4444" strokeWidth="1.2" strokeDasharray="2,2" />
-              
-              {/* Hover distance indicator text */}
-              <text x="140" y="47" textAnchor="middle" fill="#f87171" fontSize="8" fontFamily="monospace" fontWeight="bold">
-                {missDistanceKm.toFixed(3)} km Miss
-              </text>
+              {/* Axes */}
+              <line x1="20" y1="60" x2="260" y2="60" stroke="#1e293b" strokeWidth="0.5" />
+              <line x1="140" y1="10" x2="140" y2="110" stroke="#1e293b" strokeWidth="0.5" />
+              <text x="252" y="57" fill="#334155" fontSize="6" fontFamily="monospace">ξ</text>
+              <text x="144" y="16" fill="#334155" fontSize="6" fontFamily="monospace">η</text>
 
-              {/* Exact Closest Center Indicator Red Dot */}
-              <circle cx="140" cy="60" r="1.5" fill="#ef4444" />
+              {/* Center reference dot (Object A / primary asset) */}
+              <circle cx="140" cy="60" r="4" fill="#00D4FF" className="animate-pulse" />
+              <text x="122" y="55" fill="#00D4FF" fontSize="7" fontFamily="monospace" fontWeight="bold">OBJ A</text>
 
-              {/* Object A dot in cyan */}
-              <circle cx="130" cy="57" r="4" fill="#00D4FF" className="animate-pulse" />
-              <text x="112" y="55" fill="#00D4FF" fontSize="7" fontFamily="monospace" fontWeight="bold">OBJ A</text>
+              {hasBPlaneData && (
+                <g>
+                  {/* Vector from center (reference object) to real miss point */}
+                  <line
+                    x1="140" y1="60" x2={bPointX} y2={bPointY}
+                    stroke="#ef4444" strokeWidth="1.2" strokeDasharray="2,2"
+                  />
 
-              {/* Object B dot in orange */}
-              <circle cx="150" cy="63" r="4" fill="#FF6B35" />
-              <text x="168" y="72" fill="#FF6B35" fontSize="7" fontFamily="monospace" fontWeight="bold">OBJ B</text>
+                  {/* Real B-vector miss point (Object B relative position) — interactive */}
+                  <circle
+                    cx={bPointX} cy={bPointY} r="5" fill="#FF6B35"
+                    stroke={hoveredBPlane ? '#fff' : 'none'} strokeWidth="1"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setHoveredBPlane(true)}
+                    onMouseLeave={() => setHoveredBPlane(false)}
+                  />
+                  <text x={bPointX + 8} y={bPointY + 3} fill="#FF6B35" fontSize="7" fontFamily="monospace" fontWeight="bold">
+                    OBJ B
+                  </text>
+
+                  <text x="140" y="14" textAnchor="middle" fill="#f87171" fontSize="8" fontFamily="monospace" fontWeight="bold">
+                    {bMiss.toFixed(3)} km {isLiveBPlane ? '(live)' : '(TCA)'}
+                  </text>
+
+                  {hoveredBPlane && (
+                    <g>
+                      <rect x={Math.min(bPointX + 10, 180)} y={Math.max(bPointY - 22, 2)} width="98" height="30" fill="#090d16" stroke="#1e293b" strokeWidth="0.5" rx="2" />
+                      <text x={Math.min(bPointX + 14, 184)} y={Math.max(bPointY - 12, 12)} fill="#94a3b8" fontSize="6" fontFamily="monospace">
+                        ξ {bXi.toFixed(3)} km
+                      </text>
+                      <text x={Math.min(bPointX + 14, 184)} y={Math.max(bPointY - 3, 21)} fill="#94a3b8" fontSize="6" fontFamily="monospace">
+                        η {bEta.toFixed(3)} km
+                      </text>
+                    </g>
+                  )}
+                </g>
+              )}
             </svg>
             <div className="absolute bottom-1 right-2 flex items-center gap-1.5 text-[6.5px] font-mono text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Track vector A
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" /> Track vector B
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Reference asset
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" /> Encounter object
             </div>
+            {hasBPlaneData && isLiveBPlane && (
+              <div className="absolute top-1 left-2 text-[6px] font-mono text-emerald-500 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" /> LIVE — updates each telemetry refresh
+              </div>
+            )}
+            {!hasBPlaneData && (
+              <div className="absolute top-1 left-2 text-[6px] font-mono text-amber-600">
+                No state-vector data for this pair — geometry cannot be plotted
+              </div>
+            )}
           </div>
         </div>
 
@@ -587,8 +642,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
 
               <div className="flex items-center justify-between border-t border-cyan-950/20 pt-1 text-[7.5px]">
                 <span className="px-1 bg-cyan-950/40 text-[7px] border border-cyan-900/30 text-cyan-400 rounded-sm uppercase tracking-wide">{typeA}</span>
-                <span className="text-slate-400">Score: {criticA.toFixed(1)}</span>
-              </div>
+                <span className="text-slate-400">Score: {criticA !== null ? criticA.toFixed(1) : 'N/A'}</span>              </div>
             </div>
 
             {/* Object B Column */}
@@ -609,8 +663,7 @@ export default function ConjunctionDetail({ eventId, onClose, onCloseKeepSelecti
 
               <div className="flex items-center justify-between border-t border-cyan-950/20 pt-1 text-[7.5px]">
                 <span className="px-1 bg-orange-950/40 text-[7px] border border-orange-900/30 text-orange-400 rounded-sm uppercase tracking-wide">{typeB}</span>
-                <span className="text-slate-400">Score: {criticB.toFixed(1)}</span>
-              </div>
+                <span className="text-slate-400">Score: {criticB !== null ? criticB.toFixed(1) : 'N/A'}</span>              </div>
             </div>
           </div>
         </div>
